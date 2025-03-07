@@ -1,0 +1,312 @@
+{% extends "layouts/module_admin.html" %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="Permissions">Permissions</a></li>
+{% endblock %}
+{% block module %}
+<script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<div id="permissions">
+<div class="d-flex align-items-center mb-2">
+    <h4 class="me-3">Routes</h4>
+    <div class="btn btn-primary me-2 text-nowrap" @click="fetchPermissions" title="Refresh">
+        <span class="fas fa-rotate me-2" :class="loading ? 'fa-spin':''"></span>
+        Refresh
+    </div>
+</div>
+
+<div v-for="(group,name) in permissions" class="card">
+    <a class="col-auto h5 card-header" data-bs-toggle="collapse" :data-bs-target="'#group_'+name">[[ name ]]</a>
+
+    <div :id="'group_'+name" class="collapse hide card-body pa-2">
+        <div class="row ms-0">
+            <div v-for="(item, method) in group.permissions" class="col-auto card mx-1 py-1">
+                <span v-if="method == 'get'" class="badge bg-success me-3" style="width:60px">GET</span>
+                <span v-if="method == 'post'" class="badge bg-warning me-3" style="width:60px">POST</span>
+                <span v-if="method == 'put'" class="badge bg-warning me-3" style="width:60px">PUT</span>
+                <span v-if="method == 'delete'" class="badge bg-danger me-3" style="width:60px">DELETE</span>
+                
+                <div v-if="item.access_users">
+                    Access users:
+                    <span v-for="user in item.access_users" class="badge bg-success">[[user]]</span>
+                </div> 
+                <div v-if="item.denied_users">
+                    Denied users:
+                    <span v-for="user in item.denied_users" class="badge bg-danger">[[user]]</span>
+                </div> 
+                <div v-if="item.access_roles">
+                    Access roles:
+                    <span v-if="item.access_roles.includes('user')" class="badge bg-success">User</span>
+                    <span v-if="item.access_roles.includes('editor')" class="badge bg-info">Editor</span>
+                    <span v-if="item.access_roles.includes('admin')" class="badge bg-warning">Admin</span>
+                </div> 
+                <div v-if="item.denied_roles">
+                    Denied roles:
+                    <span v-if="item.denied_roles.includes('user')" class="badge bg-success">User</span>
+                    <span v-if="item.denied_roles.includes('editor')" class="badge bg-info">Editor</span>
+                    <span v-if="item.denied_roles.includes('admin')" class="badge bg-warning">Admin</span>
+                </div> 
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary btn-sm" @click="editPermission(group, true, name)"><span class="fas fa-pencil me-2"></span>Edit</button>
+            </div>
+        </div>
+
+        <table class="table table-hover table-striped mt-1" >
+            <tr>
+                <th>Endpoint</th>
+                <th>URL</th>
+                <th>Methods</th>
+            </tr>
+            <tr v-for="route in group.endpoints">
+                <td width="1%" nowrap>[[ route.endpoint ]]</td>
+                <td width="1%" nowrap><a :href="route.url">[[ route.url ]]</a></td>
+                <td class="pe-3 row">
+                    <div v-for="method in route.methods" class="col-auto card mx-1 py-1">
+                        <div v-if="method.method == 'get'" class="badge bg-success me-3" style="width:60px">GET</div>
+                        <div v-if="method.method == 'post'" class="badge bg-warning me-3" style="width:60px">POST</div>
+                        <div v-if="method.method == 'put'" class="badge bg-warning me-3" style="width:60px">PUT</div>
+                        <div v-if="method.method == 'delete'" class="badge bg-danger me-3" style="width:60px">DELETE</div>
+                            <div v-if="method.required_roles">
+                                Required roles:
+                                <span v-if="method.required_roles.includes('user')" class="badge bg-success">User</span>
+                                <span v-if="method.required_roles.includes('editor')" class="badge bg-info">Editor</span>
+                                <span v-if="method.required_roles.includes('admin')" class="badge bg-warning">Admin</span>
+                            </div>
+                            <div v-else class="badge bg-danger">Open</div>
+                        
+                            <div v-if="method.permissions">
+                                <div v-if="method.permissions.access_users">
+                                    Access users:
+                                    <span v-for="user in method.permissions.access_users" class="badge bg-success">[[user]]</span>
+                                </div> 
+                                <div v-if="method.permissions.denied_users">
+                                    Denied users:
+                                    <span v-for="user in method.permissions.denied_users" class="badge bg-danger">[[user]]</span>
+                                </div> 
+                                <div v-if="method.permissions.access_roles">
+                                    Access roles:
+                                    <span v-if="method.permissions.access_roles.includes('user')" class="badge bg-success">User</span>
+                                    <span v-if="method.permissions.access_roles.includes('editor')" class="badge bg-info">Editor</span>
+                                    <span v-if="method.permissions.access_roles.includes('admin')" class="badge bg-warning">Admin</span>
+                                </div> 
+                                <div v-if="method.permissions.denied_roles">
+                                    Denied roles:
+                                    <span v-if="method.permissions.denied_roles.includes('user')" class="badge bg-success">User</span>
+                                    <span v-if="method.permissions.denied_roles.includes('editor')" class="badge bg-info">Editor</span>
+                                    <span v-if="method.permissions.denied_roles.includes('admin')" class="badge bg-warning">Admin</span>
+                                </div> 
+                            </div>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-primary btn-sm" @click="editPermission(route, false, name+'.'+route.endpoint )"><span class="fas fa-pencil me-2"></span>Edit</button>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+<div class="modal fade" id="permissionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel">Permissions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div v-if="edit_item" class="modal-body">
+                <div v-for="(item, name) in edit_item" class="card my-1 px-2 py-1">
+                    <div>
+                        <div v-if="name == 'get'" class="badge bg-success me-3" style="width:60px">GET</div>
+                        <div v-if="name == 'post'" class="badge bg-warning me-3" style="width:60px">POST</div>
+                        <div v-if="name == 'put'" class="badge bg-warning me-3" style="width:60px">PUT</div>
+                        <div v-if="name == 'delete'" class="badge bg-danger me-3" style="width:60px">DELETE</div>
+                    </div>
+                        <div>
+                            Access users:
+                            <span v-for="(user,key) in users" class="badge" :class="item.access_users.includes(user.name) ? 'bg-success text-light':'bg-light text-dark'" @click="switchElement(name,'access_users',user.name)">
+                                <img :src="user.properties.image || '/Permissions/static/Permissions.png'" class="rounded-circle" style="width: 16px;" />
+                                [[user.description || user.name]]
+                            </span>
+                        </div> 
+                        <div>
+                            Denied users:
+                            <span v-for="(user,key) in users" class="badge" :class="item.denied_users.includes(user.name) ? 'bg-danger text-light':'bg-light text-dark'" @click="switchElement(name,'denied_users',user.name)">
+                                <img :src="user.properties.image || '/Permissions/static/Permissions.png'" class="rounded-circle" style="width: 16px;" />
+                                [[user.description || user.name]]
+                            </span>
+                        </div> 
+                        <div>
+                            Access roles:
+                            <span v-for="role in roles" class="badge" :class="item.access_roles.includes(role.name) ? 'bg-success text-light':'bg-light text-dark'" @click="switchElement(name,'access_roles',role.name)">[[role.title]]</span>
+                        </div> 
+                        <div>
+                            Denied roles:
+                            <span v-for="role in roles" class="badge" :class="item.denied_roles.includes(role.name) ? 'bg-danger text-light':'bg-light text-dark'" @click="switchElement(name,'denied_roles',role.name)">[[role.title]]</span>
+                        </div> 
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" @click="savePermissions()">Save</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+    new Vue({
+      el: '#permissions',
+      delimiters: ['[[', ']]'], // Измененные разделители
+      data: {
+        permissions: [],
+        users:[],
+        loading: false,
+        error: null,
+        edit_item:null,
+        edit_name:'',
+        roles:[
+            {'name':'user', 'title':"User"},
+            {'name':'editor', 'title':"Editor"},
+            {'name':'admin', 'title':"Admin"},
+        ],
+      },
+      async created() {
+        await this.fetchPermissions()
+      },
+      mounted() {
+
+      },
+      watch: {
+
+      },
+      computed: {
+
+      },
+      methods: {
+        fetchPermissions() {
+          this.loading = true
+          axios.get(`/api/object/class/Users`)
+            .then(response => {
+                this.users = response.data.result
+            })
+          axios.get(`/Permissions/list`)
+            .then(response => {
+                // Function to sort methods for each endpoint
+                function sortMethods(data) {
+                    const methodOrder = ['get', 'post', 'put', 'delete'] // Desired order of methods
+                    // Helper function to sort methods based on the defined order
+                    function sortEndpointMethods(methods) {
+                        return methods.sort((a, b) => {
+                        const indexA = methodOrder.indexOf(a.method.toLowerCase());
+                        const indexB = methodOrder.indexOf(b.method.toLowerCase());
+                        if (indexA === -1) return 1; // Move unknown methods to the end
+                        if (indexB === -1) return -1;
+                        return indexA - indexB;
+                        });
+                    }
+
+                    // Iterate through each service and its endpoints
+                    for (const [serviceName, serviceData] of Object.entries(data)) {
+                        if (serviceData.endpoints) {
+                        for (const endpoint of serviceData.endpoints) {
+                            if (endpoint.methods) {
+                            endpoint.methods = sortEndpointMethods(endpoint.methods);
+                            }
+                        }
+                        }
+                    }
+
+                    return data;
+                }
+
+                // Call the function and get the sorted data
+              this.permissions = sortMethods(response.data)
+              console.log(this.permissions)
+              this.loading = false
+            })
+            .catch(error => {
+              console.log(error)
+              self.error = error
+              this.loading = false
+            })
+            ;
+        },
+        editPermission(item, blueprint, name){
+            var defPermissions = { 'access_users':[], 'denied_users':[], 'access_roles':[], 'denied_roles':[]}
+            if (blueprint){
+                this.edit_name="blueprint:"+name.replace(/\./g, ":")
+                const methodOrder = ['get', 'post', 'put', 'delete'] // Desired order of methods
+
+                var def_item = {}
+                methodOrder.forEach(key => {
+                    if (item.permissions && item.permissions[key])
+                        def_item[key] = {...defPermissions,...item.permissions[key]}
+                    else
+                        def_item[key] = {...defPermissions}
+                    
+                    this.edit_item={...item.permissions}
+                
+                })
+                this.edit_item=JSON.parse(JSON.stringify(def_item))
+            }
+            else{
+                this.edit_name=name.replace(/\./g, ":")
+                var data={}
+                for (const [index, methodData] of Object.entries(item.methods)){
+                    data[methodData.method]={...defPermissions, ...methodData.permissions}
+                }
+                this.edit_item=JSON.parse(JSON.stringify(data))
+            }
+            console.log(this.edit_item)
+            $('#permissionModal').modal('show');
+        },
+        toggleElement(array, element) {
+            const index = array.indexOf(element); // Находим индекс элемента
+
+            if (index === -1) {
+                // Если элемента нет, добавляем его
+                array.push(element);
+            } else {
+                // Если элемент есть, удаляем его
+                array.splice(index, 1);
+            }
+
+            return array;
+        },
+        switchElement(method,type,element){
+            console.log(this.edit_item, this.users,method,type,element)
+            this.edit_item[method][type] = [...this.toggleElement(this.edit_item[method][type], element)]
+        },
+        savePermissions(){
+            var data = {}
+            for (const [key, methodData] of Object.entries(this.edit_item)){
+                var method = {}
+                if (methodData['access_users'].length > 0)
+                    method['access_users'] = methodData['access_users']
+                if (methodData['denied_users'].length > 0)
+                    method['denied_users'] = methodData['denied_users']
+                if (methodData['access_roles'].length > 0)
+                    method['access_roles'] = methodData['access_roles']
+                if (methodData['denied_roles'].length > 0)
+                    method['denied_roles'] = methodData['denied_roles']
+                if (Object.keys(method).length !== 0)
+                    data[key] = method
+            }
+            console.log(this.edit_name,data)
+            // save permissions
+            const payload ={
+                "data":data,
+                "source":"Permissions"
+            }
+            axios.post(`/api/property/_permissions.`+this.edit_name,payload)
+            .then(response => {
+                console.log(response.data)
+                this.fetchPermissions()
+                $('#permissionModal').modal('hide');
+            })
+        }
+
+      }
+    });
+  </script>
+{% endblock %}
