@@ -27,23 +27,23 @@
                 
                 <div v-if="item.access_users">
                     Access users:
-                    <span v-for="user in item.access_users" class="badge bg-success">[[user]]</span>
+                    <span v-for="user in item.access_users" class="badge bg-success">[[user !="*" ? user : "All"]]</span>
                 </div> 
                 <div v-if="item.denied_users">
                     Denied users:
-                    <span v-for="user in item.denied_users" class="badge bg-danger">[[user]]</span>
+                    <span v-for="user in item.denied_users" class="badge bg-danger">[[user !="*" ? user : "All"]]</span>
                 </div> 
                 <div v-if="item.access_roles">
                     Access roles:
-                    <span v-if="item.access_roles.includes('user')" class="badge bg-success">User</span>
-                    <span v-if="item.access_roles.includes('editor')" class="badge bg-info">Editor</span>
-                    <span v-if="item.access_roles.includes('admin')" class="badge bg-warning">Admin</span>
+                    <template v-for="role in roles">
+                        <span v-if="item.access_roles.includes(role.name)" class="badge bg-success">[[role.title]]</span>
+                    </template>
                 </div> 
                 <div v-if="item.denied_roles">
                     Denied roles:
-                    <span v-if="item.denied_roles.includes('user')" class="badge bg-success">User</span>
-                    <span v-if="item.denied_roles.includes('editor')" class="badge bg-info">Editor</span>
-                    <span v-if="item.denied_roles.includes('admin')" class="badge bg-warning">Admin</span>
+                    <template v-for="role in roles">
+                        <span v-if="item.denied_roles.includes(role.name)" class="badge bg-danger">[[role.title]]</span>
+                    </template>
                 </div> 
             </div>
             <div class="col-auto">
@@ -66,34 +66,35 @@
                         <div v-if="method.method == 'post'" class="badge bg-warning me-3" style="width:60px">POST</div>
                         <div v-if="method.method == 'put'" class="badge bg-warning me-3" style="width:60px">PUT</div>
                         <div v-if="method.method == 'delete'" class="badge bg-danger me-3" style="width:60px">DELETE</div>
-                            <div v-if="method.required_roles">
-                                Required roles:
-                                <span v-if="method.required_roles.includes('user')" class="badge bg-success">User</span>
-                                <span v-if="method.required_roles.includes('editor')" class="badge bg-info">Editor</span>
-                                <span v-if="method.required_roles.includes('admin')" class="badge bg-warning">Admin</span>
+                            <div>Required roles:
+                                <template v-if="method.required_roles">
+                                    <template v-for="role in roles">
+                                        <span v-if="method.required_roles.includes(role.name)" class="badge bg-success">[[role.title]]</span>
+                                    </template>
+                                </template>
+                                <span v-else class="badge bg-danger">Open</span>
                             </div>
-                            <div v-else class="badge bg-danger">Open</div>
                         
                             <div v-if="method.permissions">
                                 <div v-if="method.permissions.access_users">
                                     Access users:
-                                    <span v-for="user in method.permissions.access_users" class="badge bg-success">[[user]]</span>
+                                    <span v-for="user in method.permissions.access_users" class="badge bg-success">[[user !="*" ? user : "All"]]</span>
                                 </div> 
                                 <div v-if="method.permissions.denied_users">
                                     Denied users:
-                                    <span v-for="user in method.permissions.denied_users" class="badge bg-danger">[[user]]</span>
+                                    <span v-for="user in method.permissions.denied_users" class="badge bg-danger">[[user !="*" ? user : "All"]]</span>
                                 </div> 
                                 <div v-if="method.permissions.access_roles">
                                     Access roles:
-                                    <span v-if="method.permissions.access_roles.includes('user')" class="badge bg-success">User</span>
-                                    <span v-if="method.permissions.access_roles.includes('editor')" class="badge bg-info">Editor</span>
-                                    <span v-if="method.permissions.access_roles.includes('admin')" class="badge bg-warning">Admin</span>
+                                    <template v-for="role in roles">
+                                        <span v-if="method.permissions.access_roles.includes(role.name)" class="badge bg-success">[[role.title]]</span>
+                                    </template>
                                 </div> 
                                 <div v-if="method.permissions.denied_roles">
                                     Denied roles:
-                                    <span v-if="method.permissions.denied_roles.includes('user')" class="badge bg-success">User</span>
-                                    <span v-if="method.permissions.denied_roles.includes('editor')" class="badge bg-info">Editor</span>
-                                    <span v-if="method.permissions.denied_roles.includes('admin')" class="badge bg-warning">Admin</span>
+                                    <template v-for="role in roles">
+                                        <span v-if="method.permissions.denied_roles.includes(role.name)" class="badge bg-danger">[[role.title]]</span>
+                                    </template>
                                 </div> 
                             </div>
                     </div>
@@ -122,6 +123,10 @@
                     </div>
                         <div>
                             Access users:
+                            <span class="badge" :class="item.access_users.includes('*') ? 'bg-success text-light':'bg-light text-dark'" @click="switchElement(name,'access_users','*')">
+                                <img src="/Permissions/static/Permissions.png" class="rounded-circle" style="width: 16px;" />
+                                All
+                            </span>
                             <span v-for="(user,key) in users" class="badge" :class="item.access_users.includes(user.name) ? 'bg-success text-light':'bg-light text-dark'" @click="switchElement(name,'access_users',user.name)">
                                 <img :src="user.properties.image || '/Permissions/static/Permissions.png'" class="rounded-circle" style="width: 16px;" />
                                 [[user.description || user.name]]
@@ -129,6 +134,10 @@
                         </div> 
                         <div>
                             Denied users:
+                            <span class="badge" :class="item.denied_users.includes('*') ? 'bg-danger text-light':'bg-light text-dark'" @click="switchElement(name,'denied_users','*')">
+                                <img src="/Permissions/static/Permissions.png" class="rounded-circle" style="width: 16px;" />
+                                All
+                            </span>
                             <span v-for="(user,key) in users" class="badge" :class="item.denied_users.includes(user.name) ? 'bg-danger text-light':'bg-light text-dark'" @click="switchElement(name,'denied_users',user.name)">
                                 <img :src="user.properties.image || '/Permissions/static/Permissions.png'" class="rounded-circle" style="width: 16px;" />
                                 [[user.description || user.name]]
@@ -165,6 +174,8 @@
         edit_item:null,
         edit_name:'',
         roles:[
+            {'name':'*', 'title':"All"},
+            {'name':'guest', 'title':"Guest"},
             {'name':'user', 'title':"User"},
             {'name':'editor', 'title':"Editor"},
             {'name':'admin', 'title':"Admin"},
@@ -274,8 +285,18 @@
             return array;
         },
         switchElement(method,type,element){
-            console.log(this.edit_item, this.users,method,type,element)
-            this.edit_item[method][type] = [...this.toggleElement(this.edit_item[method][type], element)]
+            if (element == "*"){
+                if (this.edit_item[method][type].indexOf("*") === -1)
+                    this.edit_item[method][type] = ['*']
+                else
+                    this.edit_item[method][type] = []
+            }
+            else{
+                const index = this.edit_item[method][type].indexOf("*");
+                if (index >= 0)
+                    this.edit_item[method][type].splice(index, 1);
+                this.edit_item[method][type] = [...this.toggleElement(this.edit_item[method][type], element)]
+            }
         },
         savePermissions(){
             var data = {}
