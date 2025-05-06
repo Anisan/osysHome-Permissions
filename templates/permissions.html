@@ -27,11 +27,17 @@
                 
                 <div v-if="item.access_users">
                     Access users:
-                    <span v-for="user in item.access_users" class="badge bg-success">[[user !="*" ? user : "All"]]</span>
+                    <span v-for="user in item.access_users" class="badge bg-success">
+                        <img :src="getUserIcon(user)" class="rounded-circle" style="width: 16px;" />
+                        [[getUserName(user)]]
+                    </span>
                 </div> 
                 <div v-if="item.denied_users">
                     Denied users:
-                    <span v-for="user in item.denied_users" class="badge bg-danger">[[user !="*" ? user : "All"]]</span>
+                    <span v-for="user in item.denied_users" class="badge bg-danger">
+                        <img :src="getUserIcon(user)" class="rounded-circle" style="width: 16px;" />
+                        [[getUserName(user)]]
+                    </span>
                 </div> 
                 <div v-if="item.access_roles">
                     Access roles:
@@ -78,11 +84,17 @@
                             <div v-if="method.permissions">
                                 <div v-if="method.permissions.access_users">
                                     Access users:
-                                    <span v-for="user in method.permissions.access_users" class="badge bg-success">[[user !="*" ? user : "All"]]</span>
+                                    <span v-for="user in method.permissions.access_users" class="badge bg-success">
+                                        <img :src="getUserIcon(user)" class="rounded-circle" style="width: 16px;" />
+                                        [[getUserName(user)]]
+                                    </span>
                                 </div> 
                                 <div v-if="method.permissions.denied_users">
                                     Denied users:
-                                    <span v-for="user in method.permissions.denied_users" class="badge bg-danger">[[user !="*" ? user : "All"]]</span>
+                                    <span v-for="user in method.permissions.denied_users" class="badge bg-danger">
+                                        <img :src="getUserIcon(user)" class="rounded-circle" style="width: 16px;" />
+                                        [[getUserName(user)]]
+                                    </span>
                                 </div> 
                                 <div v-if="method.permissions.access_roles">
                                     Access roles:
@@ -325,8 +337,19 @@
                 this.fetchPermissions()
                 $('#permissionModal').modal('hide');
             })
-        }
-
+        },
+        getUserName(user){
+            if (user == "*")
+                return "All users"
+            if (this.users[user] !== undefined)
+                return this.users[user].description || this.users[user].name
+            return user
+        },
+        getUserIcon(user){
+            if (this.users[user] !== undefined)
+                return this.users[user].properties.image || '/Permissions/static/Permissions.png'
+            return '/Permissions/static/Permissions.png'
+        },
       }
     });
   </script>
