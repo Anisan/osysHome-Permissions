@@ -1,0 +1,19 @@
+{
+  "Access for roles": "Доступ ролям",
+  "Access for users": "Доступ пользователям",
+  "Access permissions": "Права доступа",
+  "Change search or turn off the “Only with rules” filter.": "Измените поиск или снимите фильтр «Только с правилами».",
+  "Configure module": "Настроить модуль",
+  "Default access": "Доступ по умолчанию",
+  "Default access will apply again.": "Снова будет действовать только доступ по умолчанию.",
+  "Deny for roles": "Запрет ролям",
+  "Deny for users": "Запрет пользователям",
+  "Loading…": "Загрузка…",
+  "Module, endpoint, URL…": "Модуль, endpoint, URL…",
+  "No restrictions": "Без ограничений",
+  "No routes": "Нет маршрутов",
+  "Nothing found": "Ничего не найдено",
+  "Reset module rules": "Сбросить правила модуля",
+  "Route count": "Маршрутов",
+  "Routes": "Маршруты"
+}

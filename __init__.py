@@ -1,9 +1,5 @@
 """
-# Плагин управления пользователями
-
-Упрощает управление учетными записями пользователей. 
-Плагин предоставляет администратору полный контроль над пользовательскими данными,
-позволяя легко вносить изменения и управлять доступом.   
+Permissions plugin — route and module access control.
 """
 
 import os
@@ -15,13 +11,15 @@ from app.core.lib.object import getObjectsByClass, addObject, getObject, deleteO
 from flask import redirect, jsonify, url_for
 from flask import current_app
 from app.authentication.handlers import handle_admin_required
+from app.core.lib.common import getModule
+from app.core.models.Plugins import Plugin
 
 class Permissions(BasePlugin):
 
     def __init__(self,app):
         super().__init__(app,__name__)
-        self.title = "Permissions"
-        self.description = """This is a plugin edit permissions"""
+        self.title = "Access permissions"
+        self.description = """Manage route and module access permissions"""
         self.version = "0.1"
         self.category = "System"
 
@@ -42,6 +40,24 @@ class Permissions(BasePlugin):
 
             # Словарь для хранения маршрутов, сгруппированных по blueprint
             grouped_routes = {}
+
+            def blueprint_meta(blueprint_name):
+                title = blueprint_name
+                category = "Core" if blueprint_name == "core" else "Other"
+                instance = getModule(blueprint_name)
+                if instance:
+                    title = getattr(instance, "title", None) or blueprint_name
+                    category = getattr(instance, "category", None) or category
+                try:
+                    plugin_db = Plugin.query.filter(Plugin.name == blueprint_name).one_or_none()
+                    if plugin_db:
+                        if plugin_db.title:
+                            title = plugin_db.title
+                        if plugin_db.category:
+                            category = plugin_db.category
+                except Exception:
+                    pass
+                return {"title": title, "category": category}
 
             def generate_url(rule):
                 try:
@@ -115,11 +131,14 @@ class Permissions(BasePlugin):
                 # Добавляем маршрут в соответствующую группу
                 if blueprint_name not in grouped_routes:
                     bl_permissions = getProperty("_permissions.blueprint:" + blueprint_name)
+                    meta = blueprint_meta(blueprint_name)
                     grouped_routes[blueprint_name] = {
-                        "endpoints":[],
-                        "permissions":bl_permissions,
+                        "endpoints": [],
+                        "permissions": bl_permissions,
+                        "title": meta["title"],
+                        "category": meta["category"],
                     }
                     
                 grouped_routes[blueprint_name]["endpoints"].append(route_info)
 
-            return grouped_routes, 200
+            return jsonify(grouped_routes), 200

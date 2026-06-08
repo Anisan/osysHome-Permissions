@@ -1,356 +1,1199 @@
 {% extends "layouts/module_admin.html" %}
 {% block breadcrumb %}
-<li class="breadcrumb-item"><a href="Permissions">Permissions</a></li>
+<li class="breadcrumb-item"><a href="Permissions">{{ _('Access permissions') }}</a></li>
 {% endblock %}
 {% block module %}
 <script src="{{ config.ASSETS_ROOT }}/plugins/vue/vue@2.js"></script>
 <script src="{{ config.ASSETS_ROOT }}/plugins/vue/axios.min.js"></script>
-<div id="permissions">
-<div class="d-flex align-items-center mb-2">
-    <h4 class="me-3">Routes</h4>
-    <div class="btn btn-primary me-2 text-nowrap" @click="fetchPermissions" title="Refresh">
-        <span class="fas fa-rotate me-2" :class="loading ? 'fa-spin':''"></span>
-        Refresh
-    </div>
-</div>
 
-<div v-for="(group,name) in permissions" class="card">
-    <a class="col-auto h5 card-header" data-bs-toggle="collapse" :data-bs-target="'#group_'+name">[[ name ]]</a>
+<style>
+  [v-cloak] { display: none; }
 
-    <div :id="'group_'+name" class="collapse hide card-body pa-2">
-        <div class="row ms-0">
-            <div v-for="(item, method) in group.permissions" class="col-auto card mx-1 py-1">
-                <span v-if="method == 'get'" class="badge bg-success me-3" style="width:60px">GET</span>
-                <span v-if="method == 'post'" class="badge bg-warning me-3" style="width:60px">POST</span>
-                <span v-if="method == 'put'" class="badge bg-warning me-3" style="width:60px">PUT</span>
-                <span v-if="method == 'delete'" class="badge bg-danger me-3" style="width:60px">DELETE</span>
-                
-                <div v-if="item.access_users">
-                    Access users:
-                    <span v-for="user in item.access_users" class="badge bg-success">
-                        <img :src="getUserIcon(user)" class="rounded-circle" style="width: 16px;" />
-                        [[getUserName(user)]]
-                    </span>
-                </div> 
-                <div v-if="item.denied_users">
-                    Denied users:
-                    <span v-for="user in item.denied_users" class="badge bg-danger">
-                        <img :src="getUserIcon(user)" class="rounded-circle" style="width: 16px;" />
-                        [[getUserName(user)]]
-                    </span>
-                </div> 
-                <div v-if="item.access_roles">
-                    Access roles:
-                    <template v-for="role in roles">
-                        <span v-if="item.access_roles.includes(role.name)" class="badge bg-success">[[role.title]]</span>
-                    </template>
-                </div> 
-                <div v-if="item.denied_roles">
-                    Denied roles:
-                    <template v-for="role in roles">
-                        <span v-if="item.denied_roles.includes(role.name)" class="badge bg-danger">[[role.title]]</span>
-                    </template>
-                </div> 
-            </div>
-            <div class="col-auto">
-                <button class="btn btn-primary btn-sm" @click="editPermission(group, true, name)"><span class="fas fa-pencil me-2"></span>Edit</button>
-            </div>
+  .permissions-page .page-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .permissions-page .page-header h4 {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .permissions-page .perm-toolbar {
+    position: sticky;
+    top: 0.75rem;
+    z-index: 990;
+    backdrop-filter: blur(6px);
+    margin-bottom: 1rem;
+  }
+
+  .permissions-page .perm-toolbar .card-body {
+    background: rgba(var(--bs-body-bg-rgb), 0.92);
+  }
+
+  .permissions-page .stat-card {
+    border: 1px solid rgba(var(--bs-secondary-rgb), 0.2);
+    border-radius: 0.5rem;
+    padding: 0.65rem 0.75rem;
+    text-align: center;
+    background: rgba(var(--bs-secondary-rgb), 0.04);
+  }
+
+  .permissions-page .stat-card .stat-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .permissions-page .stat-card .stat-label {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    margin-top: 0.1rem;
+  }
+
+  .permissions-page .bp-card.has-custom {
+    border-left: 3px solid var(--bs-primary);
+  }
+
+  .permissions-page .perm-empty {
+    border: 1px dashed rgba(var(--bs-secondary-rgb), 0.4);
+    border-radius: 0.5rem;
+    padding: 2rem 1.25rem;
+    text-align: center;
+    color: var(--bs-secondary-color);
+  }
+
+  .permissions-page .perm-empty i {
+    font-size: 1.75rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.45;
+  }
+
+  @media (max-width: 767.98px) {
+    .permissions-page .perm-toolbar { position: static; }
+  }
+
+  .permissions-page .bp-card {
+    border: 1px solid rgba(var(--bs-secondary-rgb), 0.25);
+    border-radius: 0.5rem;
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  }
+
+  .permissions-page .bp-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: rgba(var(--bs-secondary-rgb), 0.06);
+    user-select: none;
+    transition: background 0.15s ease;
+  }
+
+  .permissions-page .bp-card-header-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .permissions-page .bp-card-header-toggle:hover {
+    color: inherit;
+  }
+
+  .permissions-page .bp-card-header:hover {
+    background: rgba(var(--bs-primary-rgb), 0.08);
+  }
+
+  .permissions-page .bp-card-header .bp-header-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .permissions-page .bp-card-header .bp-subtitle {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    font-weight: 400;
+  }
+
+  .permissions-page .bp-chevron {
+    color: var(--bs-secondary-color);
+    transition: transform 0.2s ease;
+    width: 1rem;
+    text-align: center;
+  }
+
+  .permissions-page .bp-chevron.open {
+    transform: rotate(90deg);
+  }
+
+  .permissions-page .bp-body {
+    padding: 0.75rem 1rem 1rem;
+  }
+
+  .permissions-page .bp-perms-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(var(--bs-secondary-rgb), 0.15);
+  }
+
+  .permissions-page .method-card {
+    border: 1px solid rgba(var(--bs-secondary-rgb), 0.2);
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.65rem;
+    background: var(--bs-body-bg);
+    font-size: 0.8125rem;
+    min-width: 140px;
+  }
+
+  .permissions-page .method-card-head {
+    margin-bottom: 0.35rem;
+  }
+
+  .permissions-page .method-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3.25rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    color: #fff;
+  }
+
+  .permissions-page .method-badge.get { background: var(--bs-success); }
+  .permissions-page .method-badge.post { background: var(--bs-primary); }
+  .permissions-page .method-badge.put { background: var(--bs-info); }
+  .permissions-page .method-badge.delete { background: var(--bs-danger); }
+
+  .permissions-page .perm-line {
+    margin-top: 0.25rem;
+    line-height: 1.5;
+  }
+
+  .permissions-page .perm-line-label {
+    color: var(--bs-secondary-color);
+    font-size: 0.75rem;
+    margin-right: 0.25rem;
+  }
+
+  .permissions-page .perm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.72rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 1rem;
+    margin: 0.1rem 0.15rem 0.1rem 0;
+    white-space: nowrap;
+  }
+
+  .permissions-page .perm-badge.bg-allow { background: rgba(var(--bs-success-rgb), 0.18); color: var(--bs-success); }
+  .permissions-page .perm-badge.bg-deny { background: rgba(var(--bs-danger-rgb), 0.18); color: var(--bs-danger); }
+  .permissions-page .perm-badge.bg-route { background: rgba(var(--bs-info-rgb), 0.15); color: var(--bs-info-text-emphasis, var(--bs-info)); }
+  .permissions-page .perm-line-custom { margin-top: 0.35rem; padding-top: 0.35rem; border-top: 1px dashed rgba(var(--bs-secondary-rgb), 0.2); }
+
+  .permissions-page .perm-badge img,
+  #permissionModal img {
+    width: 14px !important;
+    height: 14px !important;
+    max-width: 14px !important;
+    max-height: 14px !important;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    display: inline-block;
+    vertical-align: middle;
+  }
+
+  /* Modal */
+  #permissionModal .modal-body {
+    padding: 1rem 1.25rem;
+  }
+
+  #permissionModal .modal-method-card {
+    border: 1px solid rgba(var(--bs-secondary-rgb), 0.22);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.65rem;
+    background: var(--bs-body-bg);
+  }
+
+  #permissionModal .modal-method-card:last-child {
+    margin-bottom: 0;
+  }
+
+  #permissionModal .modal-method-head {
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid rgba(var(--bs-secondary-rgb), 0.12);
+  }
+
+  #permissionModal .modal-method-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 4rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 0.25rem 0;
+    border-radius: 0.25rem;
+    color: #fff;
+  }
+
+  #permissionModal .modal-method-badge.get { background: var(--bs-success); }
+  #permissionModal .modal-method-badge.post { background: var(--bs-primary); }
+  #permissionModal .modal-method-badge.put { background: var(--bs-info); }
+  #permissionModal .modal-method-badge.delete { background: var(--bs-danger); }
+
+  #permissionModal .modal-perm-row {
+    display: grid;
+    grid-template-columns: 10.5rem minmax(0, 1fr);
+    gap: 0.35rem 0.75rem;
+    align-items: start;
+    margin-top: 0.5rem;
+  }
+
+  #permissionModal .modal-perm-row:first-of-type {
+    margin-top: 0;
+  }
+
+  #permissionModal .modal-perm-line-label {
+    color: var(--bs-secondary-color);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.6;
+    padding-top: 0.15rem;
+  }
+
+  #permissionModal .modal-perm-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  @media (max-width: 575.98px) {
+    #permissionModal .modal-perm-row {
+      grid-template-columns: 1fr;
+      gap: 0.25rem;
+    }
+  }
+
+  #permissionModal .modal-target {
+    font-size: 0.8rem;
+    color: var(--bs-secondary-color);
+    font-family: var(--bs-font-monospace, monospace);
+    margin-bottom: 0.75rem;
+    padding: 0.4rem 0.6rem;
+    background: rgba(var(--bs-secondary-rgb), 0.08);
+    border-radius: 0.375rem;
+    word-break: break-all;
+  }
+
+  #permissionModal .pick-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.2rem 0.55rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(var(--bs-secondary-rgb), 0.3);
+    background: rgba(var(--bs-secondary-rgb), 0.1);
+    color: var(--bs-body-color);
+    cursor: pointer;
+    user-select: none;
+    line-height: 1.4;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+
+  #permissionModal .pick-btn:hover {
+    border-color: rgba(var(--bs-primary-rgb), 0.45);
+  }
+
+  #permissionModal .pick-btn.active-allow {
+    background: var(--bs-success);
+    border-color: var(--bs-success);
+    color: #fff;
+  }
+
+  #permissionModal .pick-btn.active-deny {
+    background: var(--bs-danger);
+    border-color: var(--bs-danger);
+    color: #fff;
+  }
+
+  #permissionModal .pick-btn i {
+    font-size: 0.7rem;
+    width: 0.85rem;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  #permissionModal .pick-avatar {
+    width: 16px !important;
+    height: 16px !important;
+    max-width: 16px !important;
+    max-height: 16px !important;
+    min-width: 16px;
+    min-height: 16px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    display: block;
+  }
+
+  .permissions-page .routes-table {
+    font-size: 0.875rem;
+    margin-bottom: 0;
+  }
+
+  .permissions-page .routes-table th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--bs-secondary-color);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .permissions-page .routes-table td {
+    vertical-align: top;
+  }
+
+  .permissions-page .endpoint-name {
+    font-family: var(--bs-font-monospace, monospace);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .permissions-page .endpoint-url a {
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+    font-size: 0.8125rem;
+    word-break: break-all;
+  }
+
+  .permissions-page .endpoint-url a:hover {
+    color: var(--bs-primary);
+    text-decoration: underline;
+  }
+
+  .permissions-page .methods-cell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .permissions-page .routes-table tr.row-has-rules > td {
+    background: rgba(var(--bs-primary-rgb), 0.06);
+  }
+
+  .permissions-page .perm-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    color: var(--bs-secondary-color);
+  }
+
+</style>
+
+<div id="permissions" class="permissions-page" v-cloak>
+
+  <!-- Панель фильтров -->
+  <div class="card border-0 shadow-sm perm-toolbar">
+    <div class="card-body py-2">
+      <div class="page-header mb-2">
+        <h4>{{ _('Routes') }}</h4>
+        <button class="btn btn-primary text-nowrap" @click="fetchPermissions" :disabled="loading">
+          <span class="fas fa-rotate me-2" :class="loading ? 'fa-spin' : ''"></span>
+          [[ i18n.refresh ]]
+        </button>
+        <button class="btn btn-outline-secondary" type="button" @click="expandAll" :title="i18n.expandAll">
+          <i class="fas fa-angles-down"></i>
+        </button>
+        <button class="btn btn-outline-secondary" type="button" @click="collapseAll" :title="i18n.collapseAll">
+          <i class="fas fa-angles-up"></i>
+        </button>
+      </div>
+      <div class="d-flex align-items-center flex-wrap gap-2">
+        <div class="input-group flex-grow-1" style="min-width: 180px;">
+          <span class="input-group-text"><i class="fas fa-search"></i></span>
+          <input v-model="search" type="text" class="form-control"
+                 :placeholder="i18n.searchPlaceholder">
+          <button class="btn btn-outline-secondary" type="button" @click="search=''" :disabled="!search">
+            <i class="fa-solid fa-times"></i>
+          </button>
         </div>
-
-        <table class="table table-hover table-striped mt-1" >
-            <tr>
-                <th>Endpoint</th>
-                <th>URL</th>
-                <th>Methods</th>
-            </tr>
-            <tr v-for="route in group.endpoints">
-                <td width="1%" nowrap>[[ route.endpoint ]]</td>
-                <td width="1%" nowrap><a :href="route.url">[[ route.url ]]</a></td>
-                <td class="pe-3 row">
-                    <div v-for="method in route.methods" class="col-auto card mx-1 py-1">
-                        <div v-if="method.method == 'get'" class="badge bg-success me-3" style="width:60px">GET</div>
-                        <div v-if="method.method == 'post'" class="badge bg-warning me-3" style="width:60px">POST</div>
-                        <div v-if="method.method == 'put'" class="badge bg-warning me-3" style="width:60px">PUT</div>
-                        <div v-if="method.method == 'delete'" class="badge bg-danger me-3" style="width:60px">DELETE</div>
-                            <div>Required roles:
-                                <template v-if="method.required_roles">
-                                    <template v-for="role in roles">
-                                        <span v-if="method.required_roles.includes(role.name)" class="badge bg-success">[[role.title]]</span>
-                                    </template>
-                                </template>
-                                <span v-else class="badge bg-danger">Open</span>
-                            </div>
-                        
-                            <div v-if="method.permissions">
-                                <div v-if="method.permissions.access_users">
-                                    Access users:
-                                    <span v-for="user in method.permissions.access_users" class="badge bg-success">
-                                        <img :src="getUserIcon(user)" class="rounded-circle" style="width: 16px;" />
-                                        [[getUserName(user)]]
-                                    </span>
-                                </div> 
-                                <div v-if="method.permissions.denied_users">
-                                    Denied users:
-                                    <span v-for="user in method.permissions.denied_users" class="badge bg-danger">
-                                        <img :src="getUserIcon(user)" class="rounded-circle" style="width: 16px;" />
-                                        [[getUserName(user)]]
-                                    </span>
-                                </div> 
-                                <div v-if="method.permissions.access_roles">
-                                    Access roles:
-                                    <template v-for="role in roles">
-                                        <span v-if="method.permissions.access_roles.includes(role.name)" class="badge bg-success">[[role.title]]</span>
-                                    </template>
-                                </div> 
-                                <div v-if="method.permissions.denied_roles">
-                                    Denied roles:
-                                    <template v-for="role in roles">
-                                        <span v-if="method.permissions.denied_roles.includes(role.name)" class="badge bg-danger">[[role.title]]</span>
-                                    </template>
-                                </div> 
-                            </div>
-                    </div>
-                    <div class="col-auto">
-                        <button class="btn btn-primary btn-sm" @click="editPermission(route, false, name+'.'+route.endpoint )"><span class="fas fa-pencil me-2"></span>Edit</button>
-                    </div>
-                </td>
-            </tr>
-        </table>
-    </div>
-</div>
-<div class="modal fade" id="permissionModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="exampleModalLabel">Permissions</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div v-if="edit_item" class="modal-body">
-                <div v-for="(item, name) in edit_item" class="card my-1 px-2 py-1">
-                    <div>
-                        <div v-if="name == 'get'" class="badge bg-success me-3" style="width:60px">GET</div>
-                        <div v-if="name == 'post'" class="badge bg-warning me-3" style="width:60px">POST</div>
-                        <div v-if="name == 'put'" class="badge bg-warning me-3" style="width:60px">PUT</div>
-                        <div v-if="name == 'delete'" class="badge bg-danger me-3" style="width:60px">DELETE</div>
-                    </div>
-                        <div>
-                            Access users:
-                            <span class="badge" :class="item.access_users.includes('*') ? 'bg-success text-light':'bg-light text-dark'" @click="switchElement(name,'access_users','*')">
-                                <img src="/Permissions/static/Permissions.png" class="rounded-circle" style="width: 16px;" />
-                                All
-                            </span>
-                            <span v-for="(user,key) in users" class="badge" :class="item.access_users.includes(user.name) ? 'bg-success text-light':'bg-light text-dark'" @click="switchElement(name,'access_users',user.name)">
-                                <img :src="user.properties.image || '/Permissions/static/Permissions.png'" class="rounded-circle" style="width: 16px;" />
-                                [[user.description || user.name]]
-                            </span>
-                        </div> 
-                        <div>
-                            Denied users:
-                            <span class="badge" :class="item.denied_users.includes('*') ? 'bg-danger text-light':'bg-light text-dark'" @click="switchElement(name,'denied_users','*')">
-                                <img src="/Permissions/static/Permissions.png" class="rounded-circle" style="width: 16px;" />
-                                All
-                            </span>
-                            <span v-for="(user,key) in users" class="badge" :class="item.denied_users.includes(user.name) ? 'bg-danger text-light':'bg-light text-dark'" @click="switchElement(name,'denied_users',user.name)">
-                                <img :src="user.properties.image || '/Permissions/static/Permissions.png'" class="rounded-circle" style="width: 16px;" />
-                                [[user.description || user.name]]
-                            </span>
-                        </div> 
-                        <div>
-                            Access roles:
-                            <span v-for="role in roles" class="badge" :class="item.access_roles.includes(role.name) ? 'bg-success text-light':'bg-light text-dark'" @click="switchElement(name,'access_roles',role.name)">[[role.title]]</span>
-                        </div> 
-                        <div>
-                            Denied roles:
-                            <span v-for="role in roles" class="badge" :class="item.denied_roles.includes(role.name) ? 'bg-danger text-light':'bg-light text-dark'" @click="switchElement(name,'denied_roles',role.name)">[[role.title]]</span>
-                        </div> 
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" @click="savePermissions()">Save</button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
+        <div class="form-check form-switch mb-0 d-flex align-items-center">
+          <input class="form-check-input" type="checkbox" id="filterCustom" v-model="onlyCustom">
+          <label class="form-check-label ms-2 text-nowrap" for="filterCustom">[[ i18n.onlyCustom ]]</label>
         </div>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-4">
+          <div class="stat-card">
+            <div class="stat-value">[[ stats.blueprints ]]</div>
+            <div class="stat-label">[[ i18n.modules ]]</div>
+          </div>
+        </div>
+        <div class="col-4">
+          <div class="stat-card">
+            <div class="stat-value">[[ stats.endpoints ]]</div>
+            <div class="stat-label">[[ i18n.routeCount ]]</div>
+          </div>
+        </div>
+        <div class="col-4">
+          <div class="stat-card">
+            <div class="stat-value text-primary">[[ stats.customized ]]</div>
+            <div class="stat-label">[[ i18n.withRules ]]</div>
+          </div>
+        </div>
+      </div>
     </div>
-</div>
+  </div>
+
+  <div v-if="loading" class="perm-loading">
+    <span class="fas fa-rotate fa-spin"></span>
+    [[ i18n.loading ]]
+  </div>
+
+  <div v-else-if="isFilteredEmpty" class="perm-empty">
+    <div><i class="fas fa-shield-halved"></i></div>
+    <div v-if="hasActiveFilters">
+      <strong>[[ i18n.nothingFound ]]</strong>
+      <p class="mb-0 mt-1 small">[[ i18n.emptyFilterHint ]]</p>
+    </div>
+    <div v-else>
+      <strong>[[ i18n.noRoutes ]]</strong>
+    </div>
+  </div>
+
+  <template v-else>
+    <div v-for="item in sortedFilteredItems" :key="item.name"
+         class="bp-card"
+         :class="{ 'has-custom': hasBlueprintCustom(item.group) }">
+      <div class="bp-card-header">
+        <div class="bp-card-header-toggle" @click="toggleGroup(item.name)">
+          <i class="fas fa-chevron-right bp-chevron" :class="{ open: expanded[item.name] }"></i>
+          <div class="flex-grow-1 min-width-0">
+            <h5 class="font-monospace mb-0">[[ item.name ]]</h5>
+            <div v-if="item.group.title && item.group.title !== item.name" class="bp-subtitle">[[ item.group.title ]]</div>
+          </div>
+          <span class="badge text-bg-secondary">[[ item.group.endpoints.length ]]</span>
+          <span v-if="hasBlueprintCustom(item.group)" class="badge text-bg-primary">[[ i18n.rules ]]</span>
+        </div>
+        <button class="btn btn-sm bp-header-btn"
+                :class="hasBlueprintCustom(item.group) ? 'btn-primary' : 'btn-outline-primary'"
+                @click="editPermission(item.group, true, item.name)">
+          <span class="fas fa-sliders me-1"></span>[[ i18n.configureModule ]]
+        </button>
+        <button v-if="hasBlueprintCustom(item.group)"
+                class="btn btn-sm btn-outline-danger bp-header-btn"
+                @click="resetPermissionByKey('blueprint:' + item.name, item.name)"
+                :disabled="saving"
+                :title="i18n.resetModuleRules">
+          <span class="fas fa-rotate-left"></span>
+        </button>
+      </div>
+
+      <div v-show="expanded[item.name]" class="bp-body">
+          <!-- Права на уровне модуля -->
+          <div v-if="item.group.permissions && Object.keys(item.group.permissions).length" class="bp-perms-row">
+            <div v-for="(perm, method) in item.group.permissions" :key="'bp-'+method" class="method-card">
+              <div class="method-card-head">
+                <span class="method-badge" :class="method">[[ method.toUpperCase() ]]</span>
+              </div>
+              <div v-html="renderPermBlock(perm)"></div>
+            </div>
+          </div>
+
+          <!-- Таблица маршрутов -->
+          <div class="table-responsive">
+            <table class="table table-hover table-striped routes-table">
+              <thead>
+                <tr>
+                  <th>Endpoint</th>
+                  <th>URL</th>
+                  <th>{{ _('Methods') }}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="route in item.group.endpoints" :key="route.endpoint"
+                    :class="{ 'row-has-rules': hasEndpointCustom(route) }">
+                  <td class="endpoint-name">[[ route.endpoint ]]</td>
+                  <td class="endpoint-url"><a :href="route.url" target="_blank" rel="noopener">[[ route.url ]]</a></td>
+                  <td>
+                    <div class="methods-cell">
+                      <div v-for="method in route.methods" :key="method.method" class="method-card">
+                        <div class="method-card-head">
+                          <span class="method-badge" :class="method.method">[[ method.method.toUpperCase() ]]</span>
+                        </div>
+                        <div class="perm-line">
+                          <span class="perm-line-label">[[ i18n.defaultAccess ]]:</span>
+                          <template v-if="method.required_roles">
+                            <span v-for="role in rolesFor(method.required_roles)" :key="role.name" class="perm-badge bg-route">
+                              [[ role.title ]]
+                            </span>
+                          </template>
+                          <span v-else class="perm-badge bg-route">[[ i18n.noRestrictions ]]</span>
+                        </div>
+                        <div v-if="hasMethodCustom(method)" class="perm-line perm-line-custom" v-html="renderPermBlock(method.permissions, true)"></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-nowrap">
+                    <button class="btn btn-primary btn-sm" @click="editPermission(route, false, item.name+'.'+route.endpoint)">
+                      <span class="fas fa-pencil me-1"></span>[[ i18n.edit ]]
+                    </button>
+                    <button v-if="hasEndpointCustom(route)"
+                            class="btn btn-outline-danger btn-sm ms-1"
+                            @click="resetPermissionByKey((item.name + '.' + route.endpoint).replace(/\./g, ':'), item.name + ':' + route.endpoint)"
+                            :disabled="saving"
+                            :title="i18n.resetRules">
+                      <span class="fas fa-rotate-left"></span>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Модальное окно -->
+  <div class="modal fade" id="permissionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">[[ i18n.accessPermissions ]]</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" :aria-label="i18n.close"></button>
+        </div>
+        <div v-if="edit_item" class="modal-body">
+          <div class="modal-target" v-if="edit_name">[[ edit_name ]]</div>
+
+          <div v-for="methodName in sortedEditMethods" :key="methodName" class="modal-method-card">
+            <div class="modal-method-head">
+              <span class="modal-method-badge" :class="methodName">[[ methodName.toUpperCase() ]]</span>
+            </div>
+
+            <div class="modal-perm-row">
+              <div class="modal-perm-line-label">[[ i18n.accessForUsers ]]:</div>
+              <div class="modal-perm-chips">
+                <span class="pick-btn"
+                      :class="edit_item[methodName].access_users.includes('*') ? 'active-allow' : ''"
+                      @click="switchElement(methodName, 'access_users', '*')">
+                  <i class="fas fa-users"></i> [[ i18n.allUsers ]]
+                </span>
+                <span v-for="user in usersList" :key="'au-'+user.name"
+                      class="pick-btn"
+                      :class="edit_item[methodName].access_users.includes(user.name) ? 'active-allow' : ''"
+                      @click="switchElement(methodName, 'access_users', user.name)">
+                  <img v-if="userAvatar(user)" class="pick-avatar" :src="userAvatar(user)" width="16" height="16" alt="">
+                  <i v-else class="fas fa-user"></i>
+                  [[ user.description || user.name ]]
+                </span>
+              </div>
+            </div>
+
+            <div class="modal-perm-row">
+              <div class="modal-perm-line-label">[[ i18n.denyForUsers ]]:</div>
+              <div class="modal-perm-chips">
+                <span class="pick-btn"
+                      :class="edit_item[methodName].denied_users.includes('*') ? 'active-deny' : ''"
+                      @click="switchElement(methodName, 'denied_users', '*')">
+                  <i class="fas fa-users"></i> [[ i18n.allUsers ]]
+                </span>
+                <span v-for="user in usersList" :key="'du-'+user.name"
+                      class="pick-btn"
+                      :class="edit_item[methodName].denied_users.includes(user.name) ? 'active-deny' : ''"
+                      @click="switchElement(methodName, 'denied_users', user.name)">
+                  <img v-if="userAvatar(user)" class="pick-avatar" :src="userAvatar(user)" width="16" height="16" alt="">
+                  <i v-else class="fas fa-user"></i>
+                  [[ user.description || user.name ]]
+                </span>
+              </div>
+            </div>
+
+            <div class="modal-perm-row">
+              <div class="modal-perm-line-label">[[ i18n.accessForRoles ]]:</div>
+              <div class="modal-perm-chips">
+                <span v-for="role in roles" :key="'ar-'+role.name"
+                      class="pick-btn"
+                      :class="edit_item[methodName].access_roles.includes(role.name) ? 'active-allow' : ''"
+                      @click="switchElement(methodName, 'access_roles', role.name)">
+                  [[ role.title ]]
+                </span>
+              </div>
+            </div>
+
+            <div class="modal-perm-row">
+              <div class="modal-perm-line-label">[[ i18n.denyForRoles ]]:</div>
+              <div class="modal-perm-chips">
+                <span v-for="role in roles" :key="'dr-'+role.name"
+                      class="pick-btn"
+                      :class="edit_item[methodName].denied_roles.includes(role.name) ? 'active-deny' : ''"
+                      @click="switchElement(methodName, 'denied_roles', role.name)">
+                  [[ role.title ]]
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer justify-content-between">
+          <button type="button" class="btn btn-outline-danger"
+                  @click="resetPermissions"
+                  :disabled="saving || !hasEditCustomRules">
+            <span class="fas fa-rotate-left me-1"></span>
+            [[ i18n.resetRules ]]
+          </button>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-primary" @click="savePermissions" :disabled="saving">
+              <span v-if="saving" class="fas fa-rotate fa-spin me-1"></span>
+              [[ i18n.save ]]
+            </button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">[[ i18n.close ]]</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-    new Vue({
-      el: '#permissions',
-      delimiters: ['[[', ']]'], // Измененные разделители
-      data: {
-        permissions: [],
-        users:[],
-        loading: false,
-        error: null,
-        edit_item:null,
-        edit_name:'',
-        roles:[
-            {'name':'*', 'title':"All"},
-            {'name':'guest', 'title':"Guest"},
-            {'name':'user', 'title':"User"},
-            {'name':'editor', 'title':"Editor"},
-            {'name':'admin', 'title':"Admin"},
-        ],
+  const PERM_I18N = {
+    accessPermissions: {{ _('Access permissions')|tojson }},
+    accessForRoles: {{ _('Access for roles')|tojson }},
+    accessForUsers: {{ _('Access for users')|tojson }},
+    allUsers: {{ _('All users')|tojson }},
+    close: {{ _('Close')|tojson }},
+    collapseAll: {{ _('Collapse all')|tojson }},
+    configureModule: {{ _('Configure module')|tojson }},
+    defaultAccess: {{ _('Default access')|tojson }},
+    denyForRoles: {{ _('Deny for roles')|tojson }},
+    denyForUsers: {{ _('Deny for users')|tojson }},
+    edit: {{ _('Edit')|tojson }},
+    emptyFilterHint: {{ _('Change search or turn off the “Only with rules” filter.')|tojson }},
+    expandAll: {{ _('Expand all')|tojson }},
+    loading: {{ _('Loading…')|tojson }},
+    modules: {{ _('Modules')|tojson }},
+    noRestrictions: {{ _('No restrictions')|tojson }},
+    noRoutes: {{ _('No routes')|tojson }},
+    nothingFound: {{ _('Nothing found')|tojson }},
+    onlyCustom: {{ _('Only with rules')|tojson }},
+    refresh: {{ _('Refresh')|tojson }},
+    resetConfirm: {{ _('Reset additional rules for «{title}»?')|tojson }},
+    resetConfirmHint: {{ _('Default access will apply again.')|tojson }},
+    resetModuleRules: {{ _('Reset module rules')|tojson }},
+    resetRules: {{ _('Reset rules')|tojson }},
+    routes: {{ _('Routes')|tojson }},
+    routeCount: {{ _('Route count')|tojson }},
+    rules: {{ _('rules')|tojson }},
+    save: {{ _('Save')|tojson }},
+    searchPlaceholder: {{ _('Module, endpoint, URL…')|tojson }},
+    withRules: {{ _('With rules')|tojson }},
+  };
+
+  const PERM_ROLES = [
+    { name: '*', title: {{ _('Any role')|tojson }} },
+    { name: 'guest', title: {{ _('Guest')|tojson }} },
+    { name: 'user', title: {{ _('User')|tojson }} },
+    { name: 'editor', title: {{ _('Editor')|tojson }} },
+    { name: 'admin', title: {{ _('Administrator')|tojson }} },
+  ];
+
+  new Vue({
+    el: '#permissions',
+    delimiters: ['[[', ']]'],
+    data: {
+      i18n: PERM_I18N,
+      permissions: {},
+      usersMap: {},
+      loading: false,
+      saving: false,
+      expanded: {},
+      search: '',
+      onlyCustom: false,
+      edit_item: null,
+      edit_name: '',
+      permModal: null,
+      roles: PERM_ROLES,
+    },
+    computed: {
+      usersList() {
+        return Object.values(this.usersMap);
       },
-      async created() {
-        await this.fetchPermissions()
+      sortedEditMethods() {
+        if (!this.edit_item) return [];
+        const order = ['get', 'post', 'put', 'delete'];
+        return order.filter(m => m in this.edit_item);
       },
-      mounted() {
-
+      stats() {
+        let blueprints = 0, endpoints = 0, customized = 0;
+        for (const group of Object.values(this.permissions)) {
+          blueprints++;
+          if (this.hasBlueprintCustom(group)) customized++;
+          for (const route of (group.endpoints || [])) {
+            endpoints++;
+            if (this.hasEndpointCustom(route)) customized++;
+          }
+        }
+        return { blueprints, endpoints, customized };
       },
-      watch: {
+      filteredGroups() {
+        const q = this.search.trim().toLowerCase();
+        const hasSearch = !!q;
+        const result = {};
 
-      },
-      computed: {
+        if (!hasSearch && !this.onlyCustom) {
+          return { ...this.permissions };
+        }
 
-      },
-      methods: {
-        fetchPermissions() {
-          this.loading = true
-          axios.get(`/api/object/class/Users`)
-            .then(response => {
-                this.users = response.data.result
-            })
-          axios.get(`/Permissions/list`)
-            .then(response => {
-                // Function to sort methods for each endpoint
-                function sortMethods(data) {
-                    const methodOrder = ['get', 'post', 'put', 'delete'] // Desired order of methods
-                    // Helper function to sort methods based on the defined order
-                    function sortEndpointMethods(methods) {
-                        return methods.sort((a, b) => {
-                        const indexA = methodOrder.indexOf(a.method.toLowerCase());
-                        const indexB = methodOrder.indexOf(b.method.toLowerCase());
-                        if (indexA === -1) return 1; // Move unknown methods to the end
-                        if (indexB === -1) return -1;
-                        return indexA - indexB;
-                        });
-                    }
+        for (const [name, group] of Object.entries(this.permissions)) {
+          const moduleScore = hasSearch ? this.moduleMatchScore(name, group, q) : 0;
+          let endpoints = group.endpoints || [];
+          const bpCustom = this.hasBlueprintCustom(group);
 
-                    // Iterate through each service and its endpoints
-                    for (const [serviceName, serviceData] of Object.entries(data)) {
-                        if (serviceData.endpoints) {
-                        for (const endpoint of serviceData.endpoints) {
-                            if (endpoint.methods) {
-                            endpoint.methods = sortEndpointMethods(endpoint.methods);
-                            }
-                        }
-                        }
-                    }
+          if (hasSearch) {
+            const byEndpointUrl = this.filterEndpointsByQuery(endpoints, q);
 
-                    return data;
-                }
-
-                // Call the function and get the sorted data
-              this.permissions = sortMethods(response.data)
-              console.log(this.permissions)
-              this.loading = false
-            })
-            .catch(error => {
-              console.log(error)
-              self.error = error
-              this.loading = false
-            })
-            ;
-        },
-        editPermission(item, blueprint, name){
-            var defPermissions = { 'access_users':[], 'denied_users':[], 'access_roles':[], 'denied_roles':[]}
-            if (blueprint){
-                this.edit_name="blueprint:"+name.replace(/\./g, ":")
-                const methodOrder = ['get', 'post', 'put', 'delete'] // Desired order of methods
-
-                var def_item = {}
-                methodOrder.forEach(key => {
-                    if (item.permissions && item.permissions[key])
-                        def_item[key] = {...defPermissions,...item.permissions[key]}
-                    else
-                        def_item[key] = {...defPermissions}
-                    
-                    this.edit_item={...item.permissions}
-                
-                })
-                this.edit_item=JSON.parse(JSON.stringify(def_item))
-            }
-            else{
-                this.edit_name=name.replace(/\./g, ":")
-                var data={}
-                for (const [index, methodData] of Object.entries(item.methods)){
-                    data[methodData.method]={...defPermissions, ...methodData.permissions}
-                }
-                this.edit_item=JSON.parse(JSON.stringify(data))
-            }
-            console.log(this.edit_item)
-            $('#permissionModal').modal('show');
-        },
-        toggleElement(array, element) {
-            const index = array.indexOf(element); // Находим индекс элемента
-
-            if (index === -1) {
-                // Если элемента нет, добавляем его
-                array.push(element);
+            if (moduleScore > 0) {
+              if (this.isModulePrefixQuery(name, group, q)) {
+                endpoints = group.endpoints || [];
+              } else if (byEndpointUrl.length) {
+                endpoints = byEndpointUrl;
+              } else {
+                endpoints = group.endpoints || [];
+              }
+            } else if (byEndpointUrl.length) {
+              endpoints = byEndpointUrl;
             } else {
-                // Если элемент есть, удаляем его
-                array.splice(index, 1);
+              continue;
             }
+          }
 
-            return array;
-        },
-        switchElement(method,type,element){
-            if (element == "*"){
-                if (this.edit_item[method][type].indexOf("*") === -1)
-                    this.edit_item[method][type] = ['*']
-                else
-                    this.edit_item[method][type] = []
+          if (this.onlyCustom) {
+            if (bpCustom) {
+              endpoints = endpoints.filter(r => this.hasEndpointCustom(r));
+            } else {
+              endpoints = endpoints.filter(r => this.hasEndpointCustom(r));
+              if (!endpoints.length) continue;
             }
-            else{
-                const index = this.edit_item[method][type].indexOf("*");
-                if (index >= 0)
-                    this.edit_item[method][type].splice(index, 1);
-                this.edit_item[method][type] = [...this.toggleElement(this.edit_item[method][type], element)]
+          }
+
+          result[name] = {
+            ...group,
+            endpoints,
+            _matchScore: moduleScore,
+          };
+        }
+
+        return result;
+      },
+      sortedFilteredItems() {
+        return Object.entries(this.filteredGroups)
+          .map(([name, group]) => ({ name, group }))
+          .sort((a, b) => {
+            const sa = a.group._matchScore || 0;
+            const sb = b.group._matchScore || 0;
+            if (sb !== sa) return sb - sa;
+            return a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' });
+          });
+      },
+      isFilteredEmpty() {
+        return Object.keys(this.filteredGroups).length === 0;
+      },
+      hasActiveFilters() {
+        return !!(this.search.trim() || this.onlyCustom);
+      },
+      hasEditCustomRules() {
+        if (!this.edit_item) return false;
+        return Object.values(this.edit_item).some(d => this.hasPermData(d));
+      },
+    },
+    async created() {
+      await this.fetchPermissions();
+    },
+    watch: {
+      search() {
+        this.expandFiltered();
+      },
+      onlyCustom() {
+        this.expandFiltered();
+      },
+    },
+    methods: {
+      fetchPermissions() {
+        this.loading = true;
+        axios.get('/api/object/class/Users')
+          .then(response => {
+            const list = response.data.result || [];
+            this.usersMap = {};
+            (Array.isArray(list) ? list : Object.values(list)).forEach(u => {
+              if (u && u.name) this.usersMap[u.name] = u;
+            });
+          })
+          .catch(() => { this.usersMap = {}; });
+
+        axios.get('/Permissions/list')
+          .then(response => {
+            let data = response.data;
+            if (data && data.result && typeof data.result === 'object') {
+              data = data.result;
             }
-        },
-        savePermissions(){
-            var data = {}
-            for (const [key, methodData] of Object.entries(this.edit_item)){
-                var method = {}
-                if (methodData['access_users'].length > 0)
-                    method['access_users'] = methodData['access_users']
-                if (methodData['denied_users'].length > 0)
-                    method['denied_users'] = methodData['denied_users']
-                if (methodData['access_roles'].length > 0)
-                    method['access_roles'] = methodData['access_roles']
-                if (methodData['denied_roles'].length > 0)
-                    method['denied_roles'] = methodData['denied_roles']
-                if (Object.keys(method).length !== 0)
-                    data[key] = method
+            if (!data || typeof data !== 'object' || Array.isArray(data)) {
+              data = {};
             }
-            console.log(this.edit_name,data)
-            // save permissions
-            const payload ={
-                "data":data,
-                "source":"Permissions"
+            this.permissions = this.sortMethods(data);
+            const exp = {};
+            const names = Object.keys(this.permissions);
+            names.forEach((name, i) => {
+              exp[name] = this.expanded[name] !== undefined ? this.expanded[name] : (i === 0);
+            });
+            this.expanded = exp;
+            this.loading = false;
+          })
+          .catch(error => {
+            console.error(error);
+            this.loading = false;
+          });
+      },
+
+      sortMethods(data) {
+        const order = ['get', 'post', 'put', 'delete'];
+        for (const serviceData of Object.values(data)) {
+          if (!serviceData.endpoints) continue;
+          for (const endpoint of serviceData.endpoints) {
+            if (endpoint.methods) {
+              endpoint.methods.sort((a, b) => {
+                const ia = order.indexOf(a.method.toLowerCase());
+                const ib = order.indexOf(b.method.toLowerCase());
+                if (ia === -1) return 1;
+                if (ib === -1) return -1;
+                return ia - ib;
+              });
             }
-            axios.post(`/api/property/_permissions.`+this.edit_name,payload)
-            .then(response => {
-                console.log(response.data)
-                this.fetchPermissions()
-                $('#permissionModal').modal('hide');
-            })
-        },
-        getUserName(user){
-            if (user == "*")
-                return "All users"
-            if (this.users[user] !== undefined)
-                return this.users[user].description || this.users[user].name
-            return user
-        },
-        getUserIcon(user){
-            if (this.users[user] !== undefined)
-                return this.users[user].properties.image || '/Permissions/static/Permissions.png'
-            return '/Permissions/static/Permissions.png'
-        },
-      }
-    });
-  </script>
+          }
+        }
+        return data;
+      },
+
+      toggleGroup(name) {
+        this.$set(this.expanded, name, !this.expanded[name]);
+      },
+
+      expandAll() {
+        for (const name of Object.keys(this.permissions)) {
+          this.$set(this.expanded, name, true);
+        }
+      },
+
+      collapseAll() {
+        for (const name of Object.keys(this.permissions)) {
+          this.$set(this.expanded, name, false);
+        }
+      },
+
+      expandFiltered() {
+        if (!this.hasActiveFilters) return;
+        for (const name of Object.keys(this.filteredGroups)) {
+          this.$set(this.expanded, name, true);
+        }
+      },
+
+      moduleMatchScore(name, group, q) {
+        if (!q) return 0;
+        const n = String(name).toLowerCase();
+        const t = String(group.title || '').toLowerCase();
+
+        if (n === q) return 100;
+        if (t === q) return 95;
+        if (n.startsWith(q)) return 90;
+        if (t.startsWith(q)) return 85;
+        if (n.includes(q)) return 70;
+        if (t.includes(q)) return 65;
+        return 0;
+      },
+
+      endpointMatchesQuery(route, q) {
+        if (!q || !route) return false;
+        const endpoint = route.endpoint ? String(route.endpoint).toLowerCase() : '';
+        const url = route.url ? String(route.url).toLowerCase() : '';
+        return endpoint.includes(q) || url.includes(q);
+      },
+
+      filterEndpointsByQuery(endpoints, q) {
+        if (!q) return endpoints || [];
+        return (endpoints || []).filter(r => this.endpointMatchesQuery(r, q));
+      },
+
+      isModulePrefixQuery(name, group, q) {
+        const n = String(name).toLowerCase();
+        const t = String(group.title || '').toLowerCase();
+        return n.startsWith(q) || t.startsWith(q);
+      },
+
+      hasPermData(perm) {
+        if (!perm || typeof perm !== 'object') return false;
+        const fields = ['access_users', 'denied_users', 'access_roles', 'denied_roles'];
+        return fields.some(key => Array.isArray(perm[key]) && perm[key].length > 0);
+      },
+
+      hasMethodCustom(method) {
+        return this.hasPermData(method.permissions);
+      },
+
+      hasBlueprintCustom(group) {
+        const perms = group && group.permissions;
+        if (!perms || typeof perms !== 'object') return false;
+        return Object.values(perms).some(p => this.hasPermData(p));
+      },
+
+      hasEndpointCustom(route) {
+        return (route.methods || []).some(m => this.hasMethodCustom(m));
+      },
+
+      rolesFor(required) {
+        if (!required) return [];
+        return this.roles.filter(r => required.includes(r.name));
+      },
+
+      getUserName(user) {
+        if (user === '*') return this.i18n.allUsers;
+        const u = this.usersMap[user];
+        return u ? (u.description || u.name) : user;
+      },
+
+      userAvatar(user) {
+        if (!user) return '';
+        const img = (user.properties && user.properties.image) || user.image;
+        return (img && String(img).trim()) ? img : '';
+      },
+
+      getUserIcon(user) {
+        if (user === '*') return '';
+        const u = this.usersMap[user];
+        if (!u) return '';
+        const img = (u.properties && u.properties.image) || u.image;
+        return (img && String(img).trim()) ? img : '';
+      },
+
+      getRoleTitle(roleName) {
+        const r = this.roles.find(x => x.name === roleName);
+        return r ? r.title : roleName;
+      },
+
+      renderPermBlock(perm, inline) {
+        if (!perm || !this.hasPermData(perm)) return inline ? '' : '<span class="text-muted small">—</span>';
+        const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+        let html = '';
+
+        if (perm.access_users && perm.access_users.length) {
+          html += '<div class="perm-line"><span class="perm-line-label">' + esc(this.i18n.accessForUsers) + ':</span>';
+          perm.access_users.forEach(u => {
+            const icon = this.getUserIcon(u);
+            const iconHtml = icon
+              ? `<img class="pick-avatar" src="${esc(icon)}" width="14" height="14" alt="">`
+              : '<i class="fas fa-user"></i>';
+            html += `<span class="perm-badge bg-allow">${iconHtml}${esc(this.getUserName(u))}</span>`;
+          });
+          html += '</div>';
+        }
+        if (perm.denied_users && perm.denied_users.length) {
+          html += '<div class="perm-line"><span class="perm-line-label">' + esc(this.i18n.denyForUsers) + ':</span>';
+          perm.denied_users.forEach(u => {
+            const icon = this.getUserIcon(u);
+            const iconHtml = icon
+              ? `<img class="pick-avatar" src="${esc(icon)}" width="14" height="14" alt="">`
+              : '<i class="fas fa-user"></i>';
+            html += `<span class="perm-badge bg-deny">${iconHtml}${esc(this.getUserName(u))}</span>`;
+          });
+          html += '</div>';
+        }
+        if (perm.access_roles && perm.access_roles.length) {
+          html += '<div class="perm-line"><span class="perm-line-label">' + esc(this.i18n.accessForRoles) + ':</span>';
+          perm.access_roles.forEach(r => {
+            html += `<span class="perm-badge bg-allow">${esc(this.getRoleTitle(r))}</span>`;
+          });
+          html += '</div>';
+        }
+        if (perm.denied_roles && perm.denied_roles.length) {
+          html += '<div class="perm-line"><span class="perm-line-label">' + esc(this.i18n.denyForRoles) + ':</span>';
+          perm.denied_roles.forEach(r => {
+            html += `<span class="perm-badge bg-deny">${esc(this.getRoleTitle(r))}</span>`;
+          });
+          html += '</div>';
+        }
+        return html;
+      },
+
+      normalizeEditItem() {
+        if (!this.edit_item) return;
+        const pairs = [
+          ['access_users', 'denied_users'],
+          ['access_roles', 'denied_roles'],
+        ];
+        for (const key of Object.keys(this.edit_item)) {
+          const d = this.edit_item[key] || {};
+          const normalized = {
+            access_users: Array.isArray(d.access_users) ? [...d.access_users] : [],
+            denied_users: Array.isArray(d.denied_users) ? [...d.denied_users] : [],
+            access_roles: Array.isArray(d.access_roles) ? [...d.access_roles] : [],
+            denied_roles: Array.isArray(d.denied_roles) ? [...d.denied_roles] : [],
+          };
+          for (const [allow, deny] of pairs) {
+            const allowSet = new Set(normalized[allow]);
+            normalized[deny] = normalized[deny].filter(x => !allowSet.has(x));
+          }
+          this.$set(this.edit_item, key, normalized);
+        }
+      },
+
+      editPermission(item, blueprint, name) {
+        const def = { access_users: [], denied_users: [], access_roles: [], denied_roles: [] };
+        const methodOrder = ['get', 'post', 'put', 'delete'];
+
+        if (blueprint) {
+          this.edit_name = 'blueprint:' + name.replace(/\./g, ':');
+          const def_item = {};
+          methodOrder.forEach(key => {
+            def_item[key] = item.permissions && item.permissions[key]
+              ? { ...def, ...item.permissions[key] }
+              : { ...def };
+          });
+          this.edit_item = JSON.parse(JSON.stringify(def_item));
+        } else {
+          this.edit_name = name.replace(/\./g, ':');
+          const data = {};
+          for (const methodData of (item.methods || [])) {
+            data[methodData.method] = { ...def, ...(methodData.permissions || {}) };
+          }
+          this.edit_item = JSON.parse(JSON.stringify(data));
+        }
+        this.normalizeEditItem();
+        this.$nextTick(() => this.showPermModal());
+      },
+
+      showPermModal() {
+        const el = document.getElementById('permissionModal');
+        if (!el || typeof bootstrap === 'undefined') return;
+        if (!this.permModal) {
+          this.permModal = bootstrap.Modal.getOrCreateInstance(el);
+        }
+        this.permModal.show();
+      },
+
+      hidePermModal() {
+        if (this.permModal) this.permModal.hide();
+      },
+
+      switchElement(method, type, element) {
+        if (!this.edit_item || !this.edit_item[method]) return;
+
+        const opposite = {
+          access_users: 'denied_users',
+          denied_users: 'access_users',
+          access_roles: 'denied_roles',
+          denied_roles: 'access_roles',
+        }[type];
+
+        const current = this.edit_item[method][type] || [];
+
+        const removeFromOpposite = (value) => {
+          if (!opposite) return;
+          const opp = [...(this.edit_item[method][opposite] || [])];
+          const idx = opp.indexOf(value);
+          if (idx >= 0) {
+            opp.splice(idx, 1);
+            this.$set(this.edit_item[method], opposite, opp);
+          }
+        };
+
+        if (element === '*') {
+          if (current.indexOf('*') === -1) {
+            this.$set(this.edit_item[method], type, ['*']);
+            removeFromOpposite('*');
+          } else {
+            this.$set(this.edit_item[method], type, []);
+          }
+        } else {
+          const arr = [...current];
+          const starIdx = arr.indexOf('*');
+          if (starIdx >= 0) arr.splice(starIdx, 1);
+          const idx = arr.indexOf(element);
+          if (idx === -1) {
+            arr.push(element);
+            removeFromOpposite(element);
+          } else {
+            arr.splice(idx, 1);
+          }
+          this.$set(this.edit_item[method], type, arr);
+        }
+      },
+
+      savePermissions() {
+        const data = {};
+        for (const [key, methodData] of Object.entries(this.edit_item)) {
+          const method = {};
+          if (methodData.access_users.length) method.access_users = methodData.access_users;
+          if (methodData.denied_users.length) method.denied_users = methodData.denied_users;
+          if (methodData.access_roles.length) method.access_roles = methodData.access_roles;
+          if (methodData.denied_roles.length) method.denied_roles = methodData.denied_roles;
+          if (Object.keys(method).length) data[key] = method;
+        }
+
+        this._savePermissionData(this.edit_name, data, true);
+      },
+
+      resetPermissions() {
+        if (!this.edit_name || !this.hasEditCustomRules) return;
+        this.resetPermissionByKey(this.edit_name, this.edit_name);
+      },
+
+      resetPermissionByKey(key, label) {
+        const title = label || key;
+        const msg = this.i18n.resetConfirm.replace('{title}', title) + '\n\n' + this.i18n.resetConfirmHint;
+        if (!confirm(msg)) return;
+        this._savePermissionData(key, {}, false);
+      },
+
+      _savePermissionData(key, data, closeOnSuccess) {
+        this.saving = true;
+        axios.post('/api/property/_permissions.' + key, { data, source: 'Permissions' })
+          .then(() => {
+            this.fetchPermissions();
+            if (closeOnSuccess) {
+              this.hidePermModal();
+            } else if (this.edit_name === key) {
+              this.edit_item = null;
+              this.edit_name = '';
+              this.hidePermModal();
+            }
+          })
+          .catch(err => console.error(err))
+          .finally(() => { this.saving = false; });
+      },
+    },
+  });
+</script>
 {% endblock %}

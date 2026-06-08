@@ -1,0 +1,19 @@
+{
+  "Access for roles": "Acceso para roles",
+  "Access for users": "Acceso para usuarios",
+  "Access permissions": "Permisos de acceso",
+  "Change search or turn off the “Only with rules” filter.": "Cambie la búsqueda o desactive el filtro \"Solo con reglas\".",
+  "Configure module": "Configurar módulo",
+  "Default access": "Acceso predeterminado",
+  "Default access will apply again.": "El acceso predeterminado se aplicará nuevamente.",
+  "Deny for roles": "Negar por roles",
+  "Deny for users": "Denegar a los usuarios",
+  "Loading…": "Cargando…",
+  "Module, endpoint, URL…": "Módulo, punto final, URL…",
+  "No restrictions": "Sin restricciones",
+  "No routes": "Sin rutas",
+  "Nothing found": "No se encontró nada",
+  "Reset module rules": "Restablecer reglas del módulo",
+  "Route count": "Rutas",
+  "Routes": "Rutas"
+}

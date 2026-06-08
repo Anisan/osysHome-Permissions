@@ -1,0 +1,19 @@
+{
+  "Access for roles": "ロールへのアクセス",
+  "Access for users": "ユーザーのアクセス",
+  "Access permissions": "アクセス権限",
+  "Change search or turn off the “Only with rules” filter.": "検索を変更するか、「ルールありのみ」フィルターをオフにします。",
+  "Configure module": "モジュールの構成",
+  "Default access": "デフォルトのアクセス",
+  "Default access will apply again.": "デフォルトのアクセス権が再び適用されます。",
+  "Deny for roles": "役割を拒否する",
+  "Deny for users": "ユーザーに対して拒否する",
+  "Loading…": "読み込み中…",
+  "Module, endpoint, URL…": "モジュール、エンドポイント、URL…",
+  "No restrictions": "制限なし",
+  "No routes": "ルートがありません",
+  "Nothing found": "何も見つかりませんでした",
+  "Reset module rules": "モジュールルールをリセットする",
+  "Route count": "ルート",
+  "Routes": "ルート"
+}

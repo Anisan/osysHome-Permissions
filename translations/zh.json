@@ -1,0 +1,19 @@
+{
+  "Access for roles": "角色访问权限",
+  "Access for users": "用户访问",
+  "Access permissions": "访问权限",
+  "Change search or turn off the “Only with rules” filter.": "更改搜索或关闭“仅符合规则”过滤器。",
+  "Configure module": "配置模块",
+  "Default access": "默认访问",
+  "Default access will apply again.": "默认访问权限将再次应用。",
+  "Deny for roles": "拒绝角色",
+  "Deny for users": "拒绝用户",
+  "Loading…": "加载中…",
+  "Module, endpoint, URL…": "模块、端点、URL…",
+  "No restrictions": "无限制",
+  "No routes": "没有路线",
+  "Nothing found": "没有找到任何内容",
+  "Reset module rules": "重置模块规则",
+  "Route count": "路线",
+  "Routes": "路线"
+}

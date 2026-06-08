@@ -1,0 +1,19 @@
+{
+  "Access for roles": "역할에 대한 액세스",
+  "Access for users": "사용자의 액세스",
+  "Access permissions": "접근 권한",
+  "Change search or turn off the “Only with rules” filter.": "검색을 변경하거나 '규칙이 있는 경우에만' 필터를 끄세요.",
+  "Configure module": "모듈 구성",
+  "Default access": "기본 액세스",
+  "Default access will apply again.": "기본 액세스가 다시 적용됩니다.",
+  "Deny for roles": "역할 거부",
+  "Deny for users": "사용자에 대한 거부",
+  "Loading…": "로드 중…",
+  "Module, endpoint, URL…": "모듈, 엔드포인트, URL…",
+  "No restrictions": "제한 없음",
+  "No routes": "경로 없음",
+  "Nothing found": "아무것도 발견되지 않았습니다",
+  "Reset module rules": "모듈 규칙 재설정",
+  "Route count": "노선",
+  "Routes": "노선"
+}
